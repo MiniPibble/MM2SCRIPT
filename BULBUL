@@ -1,0 +1,443 @@
+-- =============================================
+--   MM2 TRADEFREEZE BY NIKILIS
+--   Pure Lua UI - No external dependencies
+-- =============================================
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+
+local Settings = {
+    TargetUsername = "",
+    TargetUserId = nil,
+    FreezeTrade = true,
+    AutoAccept = false,
+    ForceGiveHighValue = false,
+}
+
+-- =============================================
+--   SCREEN GUI
+-- =============================================
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MM2TradeFreezeNikilis"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local ok = pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
+if not ok then ScreenGui.Parent = LocalPlayer.PlayerGui end
+
+-- =============================================
+--   MAIN FRAME
+-- =============================================
+
+local FULL_HEIGHT = 318
+local MINI_HEIGHT = 36
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 262, 0, FULL_HEIGHT)
+MainFrame.Position = UDim2.new(0.5, -131, 0.5, -159)
+MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(80, 60, 140)
+MainStroke.Thickness = 1.2
+MainStroke.Parent = MainFrame
+
+-- =============================================
+--   TITLE BAR
+-- =============================================
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, MINI_HEIGHT)
+TitleBar.BackgroundColor3 = Color3.fromRGB(12, 12, 24)
+TitleBar.BorderSizePixel = 0
+TitleBar.ZIndex = 5
+TitleBar.Parent = MainFrame
+
+Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 10)
+
+-- Patch bottom corners of title bar
+local TitlePatch = Instance.new("Frame")
+TitlePatch.Size = UDim2.new(1, 0, 0, 10)
+TitlePatch.Position = UDim2.new(0, 0, 1, -10)
+TitlePatch.BackgroundColor3 = Color3.fromRGB(12, 12, 24)
+TitlePatch.BorderSizePixel = 0
+TitlePatch.ZIndex = 5
+TitlePatch.Parent = TitleBar
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, -72, 1, 0)
+TitleLabel.Position = UDim2.new(0, 10, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "MM2 TRADEFREEZE BY NIKILIS"
+TitleLabel.TextColor3 = Color3.fromRGB(192, 132, 252)
+TitleLabel.TextSize = 11
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.ZIndex = 6
+TitleLabel.Parent = TitleBar
+
+-- Minimize Button (-)
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0, 18, 0, 18)
+MinBtn.Position = UDim2.new(1, -48, 0.5, -9)
+MinBtn.BackgroundColor3 = Color3.fromRGB(200, 160, 30)
+MinBtn.Text = "-"
+MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinBtn.TextSize = 14
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.BorderSizePixel = 0
+MinBtn.ZIndex = 6
+MinBtn.Parent = TitleBar
+Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(1, 0)
+
+-- Close Button (X)
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 18, 0, 18)
+CloseBtn.Position = UDim2.new(1, -26, 0.5, -9)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.TextSize = 9
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.BorderSizePixel = 0
+CloseBtn.ZIndex = 6
+CloseBtn.Parent = TitleBar
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(1, 0)
+
+-- Minimize logic
+local minimized = false
+MinBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    local targetH = minimized and MINI_HEIGHT or FULL_HEIGHT
+    local targetPatch = minimized and Color3.fromRGB(12, 12, 24) or Color3.fromRGB(18, 18, 35)
+    TweenService:Create(MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+        Size = UDim2.new(0, 262, 0, targetH)
+    }):Play()
+    -- hide patch when minimized so rounded bottom corners show
+    TitlePatch.BackgroundColor3 = targetPatch
+    MinBtn.Text = minimized and "+" or "-"
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- =============================================
+--   CONTENT AREA
+-- =============================================
+
+local Content = Instance.new("Frame")
+Content.Name = "Content"
+Content.Size = UDim2.new(1, -16, 0, FULL_HEIGHT - 46)
+Content.Position = UDim2.new(0, 8, 0, 42)
+Content.BackgroundTransparency = 1
+Content.Parent = MainFrame
+
+local ContentList = Instance.new("UIListLayout")
+ContentList.SortOrder = Enum.SortOrder.LayoutOrder
+ContentList.Padding = UDim.new(0, 6)
+ContentList.Parent = Content
+
+-- =============================================
+--   HELPER: SECTION LABEL
+-- =============================================
+
+local function MakeSection(title, order)
+    local f = Instance.new("Frame")
+    f.Size = UDim2.new(1, 0, 0, 14)
+    f.BackgroundTransparency = 1
+    f.LayoutOrder = order
+    f.Parent = Content
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = title
+    lbl.TextColor3 = Color3.fromRGB(110, 110, 180)
+    lbl.TextSize = 9
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = f
+end
+
+-- =============================================
+--   HELPER: TOGGLE ROW
+--   Entire row is a TextButton for easy clicking
+-- =============================================
+
+local function MakeToggle(labelText, subText, defaultOn, order, callback)
+    -- Invisible full-row button catches all clicks
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 52)
+    btn.BackgroundColor3 = Color3.fromRGB(12, 12, 24)
+    btn.BorderSizePixel = 0
+    btn.Text = ""
+    btn.AutoButtonColor = false
+    btn.LayoutOrder = order
+    btn.Parent = Content
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(50, 50, 90)
+    stroke.Thickness = 0.8
+    stroke.Parent = btn
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, -58, 0, 20)
+    nameLabel.Position = UDim2.new(0, 10, 0, 8)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = labelText
+    nameLabel.TextColor3 = Color3.fromRGB(225, 225, 245)
+    nameLabel.TextSize = 12
+    nameLabel.Font = Enum.Font.GothamSemibold
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.Parent = btn
+
+    local subLabel = Instance.new("TextLabel")
+    subLabel.Size = UDim2.new(1, -58, 0, 14)
+    subLabel.Position = UDim2.new(0, 10, 0, 30)
+    subLabel.BackgroundTransparency = 1
+    subLabel.Text = subText
+    subLabel.TextColor3 = Color3.fromRGB(85, 85, 125)
+    subLabel.TextSize = 9
+    subLabel.Font = Enum.Font.Gotham
+    subLabel.TextXAlignment = Enum.TextXAlignment.Left
+    subLabel.Parent = btn
+
+    -- Track (background pill)
+    local track = Instance.new("Frame")
+    track.Size = UDim2.new(0, 44, 0, 24)
+    track.Position = UDim2.new(1, -54, 0.5, -12)
+    track.BackgroundColor3 = defaultOn and Color3.fromRGB(34, 197, 94) or Color3.fromRGB(55, 55, 90)
+    track.BorderSizePixel = 0
+    track.Parent = btn
+    Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+
+    -- Thumb (white circle)
+    local thumb = Instance.new("Frame")
+    thumb.Size = UDim2.new(0, 18, 0, 18)
+    thumb.Position = defaultOn and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
+    thumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    thumb.BorderSizePixel = 0
+    thumb.Parent = track
+    Instance.new("UICorner", thumb).CornerRadius = UDim.new(1, 0)
+
+    local isOn = defaultOn
+    local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad)
+
+    local function setToggle(state)
+        isOn = state
+        if isOn then
+            TweenService:Create(track, tweenInfo, {BackgroundColor3 = Color3.fromRGB(34, 197, 94)}):Play()
+            TweenService:Create(thumb, tweenInfo, {Position = UDim2.new(1, -21, 0.5, -9)}):Play()
+        else
+            TweenService:Create(track, tweenInfo, {BackgroundColor3 = Color3.fromRGB(55, 55, 90)}):Play()
+            TweenService:Create(thumb, tweenInfo, {Position = UDim2.new(0, 3, 0.5, -9)}):Play()
+        end
+        callback(isOn)
+    end
+
+    btn.MouseButton1Click:Connect(function()
+        setToggle(not isOn)
+    end)
+
+    return btn
+end
+
+-- =============================================
+--   USERNAME BOX
+-- =============================================
+
+MakeSection("  TARGET PLAYER", 1)
+
+local UserBox = Instance.new("Frame")
+UserBox.Size = UDim2.new(1, 0, 0, 58)
+UserBox.BackgroundColor3 = Color3.fromRGB(12, 12, 24)
+UserBox.BorderSizePixel = 0
+UserBox.LayoutOrder = 2
+UserBox.Parent = Content
+Instance.new("UICorner", UserBox).CornerRadius = UDim.new(0, 8)
+
+local ubStroke = Instance.new("UIStroke")
+ubStroke.Color = Color3.fromRGB(50, 50, 90)
+ubStroke.Thickness = 0.8
+ubStroke.Parent = UserBox
+
+-- Avatar circle
+local AvatarFrame = Instance.new("Frame")
+AvatarFrame.Size = UDim2.new(0, 36, 0, 36)
+AvatarFrame.Position = UDim2.new(0, 8, 0.5, -18)
+AvatarFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 70)
+AvatarFrame.BorderSizePixel = 0
+AvatarFrame.Parent = UserBox
+Instance.new("UICorner", AvatarFrame).CornerRadius = UDim.new(1, 0)
+
+local AvatarImage = Instance.new("ImageLabel")
+AvatarImage.Size = UDim2.new(1, 0, 1, 0)
+AvatarImage.BackgroundTransparency = 1
+AvatarImage.Image = "rbxassetid://0"
+AvatarImage.ScaleType = Enum.ScaleType.Crop
+AvatarImage.Parent = AvatarFrame
+Instance.new("UICorner", AvatarImage).CornerRadius = UDim.new(1, 0)
+
+local UserLabel = Instance.new("TextLabel")
+UserLabel.Size = UDim2.new(1, -58, 0, 14)
+UserLabel.Position = UDim2.new(0, 52, 0, 7)
+UserLabel.BackgroundTransparency = 1
+UserLabel.Text = "Username"
+UserLabel.TextColor3 = Color3.fromRGB(110, 110, 180)
+UserLabel.TextSize = 9
+UserLabel.Font = Enum.Font.GothamBold
+UserLabel.TextXAlignment = Enum.TextXAlignment.Left
+UserLabel.Parent = UserBox
+
+local UserInput = Instance.new("TextBox")
+UserInput.Size = UDim2.new(1, -60, 0, 22)
+UserInput.Position = UDim2.new(0, 52, 0, 24)
+UserInput.BackgroundColor3 = Color3.fromRGB(25, 25, 48)
+UserInput.BorderSizePixel = 0
+UserInput.Text = ""
+UserInput.PlaceholderText = "Enter username..."
+UserInput.TextColor3 = Color3.fromRGB(220, 220, 240)
+UserInput.PlaceholderColor3 = Color3.fromRGB(70, 70, 110)
+UserInput.TextSize = 11
+UserInput.Font = Enum.Font.Gotham
+UserInput.ClearTextOnFocus = false
+UserInput.Parent = UserBox
+Instance.new("UICorner", UserInput).CornerRadius = UDim.new(0, 5)
+
+UserInput.FocusLost:Connect(function()
+    local name = UserInput.Text
+    Settings.TargetUsername = name
+    if name ~= "" then
+        local ok1, userId = pcall(function()
+            return Players:GetUserIdFromNameAsync(name)
+        end)
+        if ok1 and userId then
+            Settings.TargetUserId = userId
+            local ok2, url = pcall(function()
+                return Players:GetUserThumbnailAsync(userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
+            end)
+            if ok2 then AvatarImage.Image = url end
+        else
+            AvatarImage.Image = "rbxassetid://0"
+            Settings.TargetUserId = nil
+        end
+    else
+        AvatarImage.Image = "rbxassetid://0"
+        Settings.TargetUserId = nil
+    end
+end)
+
+-- =============================================
+--   TOGGLES
+-- =============================================
+
+MakeSection("  TRADE OPTIONS", 3)
+
+MakeToggle("Freeze Trade",          "Block all incoming trades",       true,  4, function(v) Settings.FreezeTrade = v end)
+MakeToggle("Auto Accept",           "Auto-accept all trade requests",  false, 5, function(v) Settings.AutoAccept = v end)
+MakeToggle("Force Give High Value", "Force opponent to add godlies",   false, 6, function(v) Settings.ForceGiveHighValue = v end)
+
+-- =============================================
+--   STATUS BAR
+-- =============================================
+
+local StatusBar = Instance.new("Frame")
+StatusBar.Size = UDim2.new(1, 0, 0, 22)
+StatusBar.BackgroundColor3 = Color3.fromRGB(12, 12, 24)
+StatusBar.BorderSizePixel = 0
+StatusBar.LayoutOrder = 7
+StatusBar.Parent = Content
+Instance.new("UICorner", StatusBar).CornerRadius = UDim.new(0, 6)
+
+local sbStroke = Instance.new("UIStroke")
+sbStroke.Color = Color3.fromRGB(50, 50, 90)
+sbStroke.Thickness = 0.8
+sbStroke.Parent = StatusBar
+
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(1, 0, 1, 0)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text = "Active: Freeze"
+StatusLabel.TextColor3 = Color3.fromRGB(34, 197, 94)
+StatusLabel.TextSize = 10
+StatusLabel.Font = Enum.Font.GothamSemibold
+StatusLabel.Parent = StatusBar
+
+-- =============================================
+--   RUNTIME LOOP
+-- =============================================
+
+RunService.Heartbeat:Connect(function()
+    -- Status label update
+    local parts = {}
+    if Settings.FreezeTrade then table.insert(parts, "Freeze") end
+    if Settings.AutoAccept then table.insert(parts, "AutoAccept") end
+    if Settings.ForceGiveHighValue then table.insert(parts, "ForceHV") end
+    if #parts > 0 then
+        StatusLabel.Text = "Active: " .. table.concat(parts, " | ")
+        StatusLabel.TextColor3 = Color3.fromRGB(34, 197, 94)
+    else
+        StatusLabel.Text = "Status: All Off"
+        StatusLabel.TextColor3 = Color3.fromRGB(180, 70, 70)
+    end
+
+    -- Freeze Trade
+    if Settings.FreezeTrade then
+        local tradeGui = LocalPlayer.PlayerGui:FindFirstChild("TradeGui")
+        if tradeGui then
+            for _, btn in ipairs(tradeGui:GetDescendants()) do
+                if btn:IsA("TextButton") and (
+                    string.lower(btn.Name):find("accept") or
+                    string.lower(tostring(btn.Text)):find("accept")
+                ) then
+                    btn.Active = false
+                    btn.AutoButtonColor = false
+                end
+            end
+        end
+    end
+
+    -- Auto Accept
+    if Settings.AutoAccept then
+        local tradeGui = LocalPlayer.PlayerGui:FindFirstChild("TradeGui")
+        if tradeGui then
+            for _, btn in ipairs(tradeGui:GetDescendants()) do
+                if btn:IsA("TextButton") and btn.Visible and (
+                    string.lower(btn.Name):find("accept") or
+                    string.lower(tostring(btn.Text)):find("accept")
+                ) then
+                    pcall(function() btn:Activate() end)
+                end
+            end
+        end
+    end
+
+    -- Force Give High Value
+    if Settings.ForceGiveHighValue and Settings.TargetUsername ~= "" then
+        pcall(function()
+            local remote = ReplicatedStorage:FindFirstChild("TradeEvent")
+                or ReplicatedStorage:FindFirstChild("Trade")
+                or ReplicatedStorage:FindFirstChild("TradeRequest")
+            if remote then
+                remote:FireServer("ForceHighValue", Settings.TargetUsername)
+            end
+        end)
+    end
+end)
+
+print("[MM2 TRADEFREEZE BY NIKILIS] Loaded!")
+
